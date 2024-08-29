@@ -1,13 +1,14 @@
 package main
 
 import (
+	"RF433Go/RF433T"
+	"RF433Go/serialDevice"
 	"bufio"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
 	"time"
-	"wmbusGo/RF433T"
-	"wmbusGo/serialDevice"
 )
 
 var NSTARTSTOP = 20
@@ -25,70 +26,28 @@ func main() {
 	time.Sleep(1 * time.Second)
 
 	go func() {
+		var i uint64 = 250
+		b := make([]byte, 8)
 		for {
-			d.Write([]byte{0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-				0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-				0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
-				0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
-				0x48, 0x45, 0x4C, 0x4C, 0x4F,
-				0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
-				0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04})
-			//fmt.Println("Sent")
-			time.Sleep(1000 * time.Millisecond) // 3ms minimum delay
+			binary.BigEndian.PutUint64(b, i)
+			rf433t.Write(b)
+			i++
+			time.Sleep(500 * time.Millisecond) // 3ms minimum delay
 		}
 	}()
 
 	go func() {
-		var start = 0
-		var stop = 0
-		var trame = false
-		var buf []byte
-		var cnt = 0
 		for {
-			n, b := d.Read()
-			/*
-				fmt.Printf("Received %d bytes: ", n)
+			n, b, err := rf433t.Read()
+			if err != nil {
+				log.Printf("ERR: %s", err)
+			} else {
+				fmt.Printf("Read %d bytes: ", n)
 				for i := 0; i < n; i++ {
-					fmt.Printf("%02x ", b[i])
+					fmt.Printf("%02X ", b[i])
 				}
-				fmt.Println("")
-			*/
-
-			for i := 0; i < n; i++ {
-				symbol := b[i]
-				if start >= NSTARTSTOP {
-					if symbol == 0x04 {
-						stop = stop + 1
-						if stop >= NSTARTSTOP {
-							trame = true
-						}
-					} else {
-						buf = append(buf, symbol)
-						cnt = cnt + 1
-					}
-				}
-				if symbol == 0x02 {
-					start = start + 1
-					stop = 0
-					cnt = 0
-					buf = make([]byte, 0)
-				}
+				fmt.Println()
 			}
-			if trame {
-				fmt.Printf("Trame: ")
-				for i := 0; i < len(buf); i++ {
-					fmt.Printf("%02x ", buf[i])
-				}
-				fmt.Println("")
-				trame = false
-				start = 0
-				stop = 0
-				cnt = 0
-				buf = make([]byte, 0)
-			}
-
 		}
 	}()
 

@@ -1,4 +1,4 @@
-module wmbusGo
+module RF433Go
 
 go 1.22
 
