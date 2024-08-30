@@ -14,6 +14,7 @@ import (
 
 var INITIAL_SEED uint64 = 250
 var SIZE_OF_BUFFER_CODE = 256
+var USE_ROLLING_CODE = false
 
 func main() {
 	namePort, err := serialDevice.Search()
@@ -31,8 +32,10 @@ func main() {
 		var seed = INITIAL_SEED
 		b := make([]byte, 8)
 		for {
-			rand.Seed(int64(seed))
-			seed = rand.Uint64()
+			if USE_ROLLING_CODE {
+				rand.Seed(int64(seed))
+				seed = rand.Uint64()
+			}
 			binary.BigEndian.PutUint64(b, seed)
 			rf433t.Write(b)
 			time.Sleep(1000 * time.Millisecond) // 3ms minimum delay
@@ -41,26 +44,43 @@ func main() {
 
 	go func() {
 		var seed = INITIAL_SEED
+		var codes = make([]uint64, SIZE_OF_BUFFER_CODE)
+		codes[0] = seed
+		for i := 1; i < SIZE_OF_BUFFER_CODE; i++ {
+			rand.Seed(int64(seed))
+			codes[i] = rand.Uint64()
+			seed = codes[i]
+		}
 		for {
 			n, b, err := rf433t.Read()
 			if err != nil {
 				log.Printf("ERR: %s", err)
 			} else {
-				fmt.Printf("Read %d bytes: ", n)
+				var txt = "Read %d bytes: "
+				//fmt.Printf("Read %d bytes: ", n)
+				txt = fmt.Sprintf(txt, n)
 				for i := 0; i < n; i++ {
-					fmt.Printf("%02X ", b[i])
+					//log.Printf("%02X ", b[i])
+					txt = fmt.Sprintf("%s%02X ", txt, b[i])
 				}
-				for i := 0; i < SIZE_OF_BUFFER_CODE; i++ {
-					rand.Seed(int64(seed))
-					expected := rand.Uint64()
-					received := binary.BigEndian.Uint64(b[:8])
-					if expected == received {
-						fmt.Print(" - Codes match --> open door !")
+				var code = binary.BigEndian.Uint64(b[:8])
+				for i := range codes {
+					if code == codes[i] {
+						//fmt.Print(" - Code match --> open door !")
+						txt = fmt.Sprintf("%s - Code match --> open door !", txt)
+						if USE_ROLLING_CODE {
+							seed = code
+							for j := 0; j < SIZE_OF_BUFFER_CODE; j++ {
+								rand.Seed(int64(seed))
+								codes[j] = rand.Uint64()
+								seed = codes[j]
+							}
+						}
 						break
 					}
-					seed = expected
 				}
-				fmt.Println()
+				//fmt.Println()
+				log.Printf(txt)
 			}
 
 		}

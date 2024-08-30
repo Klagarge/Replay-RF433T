@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-var NSTARTSTOP = 2
+var NSTARTSTOP = 5
 
 type RF433T struct {
 	device *serialDevice.Device
