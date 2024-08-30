@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-var NSTARTSTOP = 20
+var NSTARTSTOP = 2
 
 type RF433T struct {
 	device *serialDevice.Device
@@ -34,7 +34,7 @@ func (r *RF433T) Disconnect() {
 
 func (r *RF433T) Write(data []byte) {
 	buffer := make([]byte, 0)
-	for i := 0; i < 40; i++ {
+	for i := 0; i < NSTARTSTOP*2; i++ {
 		buffer = append(buffer, byte(0xAA))
 	}
 	for i := 0; i < NSTARTSTOP; i++ {
@@ -71,15 +71,19 @@ func (r *RF433T) Read() (int, []byte, error) {
 						return len(buf), buf, nil
 					}
 				} else {
+					stop = 0
 					buf = append(buf, symbol)
 					cnt = cnt + 1
 				}
-			}
-			if symbol == 0x02 {
-				start = start + 1
-				stop = 0
-				cnt = 0
-				buf = make([]byte, 0)
+			} else {
+				if symbol == 0x02 {
+					start = start + 1
+					stop = 0
+					cnt = 0
+					buf = make([]byte, 0)
+				} else {
+					start = 0
+				}
 			}
 		}
 
